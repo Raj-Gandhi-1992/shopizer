@@ -1,22 +1,22 @@
-FROM openjdk:17-jdk-slim AS build
+# Stage 1: Build with Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Install Git and Maven (if not using the Maven Wrapper)
-RUN apt-get update && apt-get install -y git maven && rm -rf /var/lib/apt/lists/*
+# Copy project files
+COPY . .
 
-# Clone the Shopizer repository
-RUN git clone https://github.com/shopizer-ecommerce/shopizer.git .
+# Build Shopizer without tests (faster)
+RUN mvn clean package -DskipTests
 
-# Build the project (without packaging) and download dependencies
-RUN mvn clean install -DskipTests
-
-# You can optionally navigate to the module then run using spring-boot:run
-
+# Stage 2: Minimal runtime image
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 
-# Copy the full build context and Maven wrapper if present
-COPY --from=build /app . 
+# Copy only the sm-shop jar from build stage
+COPY --from=build /app/sm-shop/target/*.jar app.jar
 
-# Run the backend using Maven directly
-CMD ["mvn", "-pl", "sm-shop", "spring-boot:run"]
+# Expose default Shopizer port
+EXPOSE 8080
+
+# Run the jar
+CMD ["java", "-jar", "app.jar"]
